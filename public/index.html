@@ -1,0 +1,63 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lumi — the AI waiter for your restaurant</title><link rel="stylesheet" href="/app.css"></head><body>
+<div class="orbs"><i></i><i></i><i></i></div>
+<div class="nav"><div class="logo"><i></i>Lumi</div><div class="row"><a href="/demo">Split-screen demo</a><a class="btn g sm" href="/r/demo">Live demo →</a></div></div>
+<main><div id="home"><div class="hero up"><span class="tag h">AI for restaurants · built in Baku</span><h1 style="margin-top:18px">Paste your menu.<br><span class="grad">Meet your AI waiter.</span></h1>
+<p>Guests say their budget, time and diet. Lumi picks from your real menu, checks every price, and sends the order to your kitchen with a live ready-time.</p>
+<div class="row" style="justify-content:center"><button class="btn" onclick="show('wiz')">Get started — add your restaurant</button><a class="btn g" href="/r/demo">Try the demo restaurant</a></div></div>
+<div class="wrap"><div class="steps">
+<div class="glass up" style="animation-delay:.1s"><div class="n">🪄</div><h3>1 · Import</h3><p class="mut" style="margin-top:8px">Paste menu text. AI turns it into structured, editable data in seconds.</p></div>
+<div class="glass up" style="animation-delay:.2s"><div class="n">💬</div><h3>2 · Guests ask</h3><p class="mut" style="margin-top:8px">“2 people, ₼40, one vegetarian, 25 min” — in Azerbaijani, English or Russian.</p></div>
+<div class="glass up" style="animation-delay:.3s"><div class="n">✅</div><h3>3 · Verified</h3><p class="mut" style="margin-top:8px">Code, not AI, checks prices, allergens, availability and totals.</p></div>
+<div class="glass up" style="animation-delay:.4s"><div class="n">🍳</div><h3>4 · Kitchen</h3><p class="mut" style="margin-top:8px">Structured tickets, one-tap statuses, live ETA back to the guest.</p></div></div></div></div>
+<div id="wiz" class="modal" hidden style="max-width:1240px"><div class="glass pad up"><h2>Add your restaurant</h2>
+<p class="mut" style="margin:6px 0 14px">Step 1 — chat with Lumi. Describe your menu in your own words (Azerbaijani, English or Russian): dishes, prices, ingredients. You can keep chatting to add, change or remove dishes.</p>
+<input id="nm" placeholder="Restaurant name" style="margin-bottom:12px">
+<div id="mc" class="chat" style="max-height:320px"></div><div class="chips" id="mchips"></div>
+<div class="row" style="align-items:flex-end"><textarea id="tx" rows="3" placeholder="Məs: Plov 16 manat, quzu əti, quru meyvə ilə. Dolma 9 manat. Çay 2.5 manat…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();imp()}"></textarea><button class="btn" id="bi" onclick="imp()">Send</button></div>
+<div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn g sm" onclick="demo()">Use sample menu</button><button class="btn g sm" onclick="show('home')">Back</button><span id="ms" class="sm mut"></span></div></div>
+<div id="rev" class="glass pad up" hidden style="margin-top:18px"><div class="row sp" style="flex-wrap:wrap"><h3>Step 2 — review &amp; edit</h3><button class="btn g sm" onclick="addRow()">＋ Add dish</button></div>
+<p class="sm mut" style="margin:6px 0 12px">Edit anything. Click the photo box to upload your own dish photo (stored in Supabase). Allergens: comma-separated from gluten, dairy, nuts, egg, fish, shellfish, soy, sesame · <b>none</b> = no allergens · empty = unknown (treated as unsafe for allergy requests).</p>
+<div style="overflow:auto"><table id="tb"></table></div>
+<div class="row" style="margin-top:16px;flex-wrap:wrap"><button class="btn g" onclick="addRow()">＋ Add dish</button><button class="btn" onclick="launch()">🚀 Launch restaurant</button><span id="ls"></span></div></div>
+<input type="file" id="fi" accept="image/jpeg,image/png,image/webp,image/*" hidden></div></main>
+<script>
+const $=s=>document.querySelector(s);let items=[],meta={},hist=[],pick=null;
+const show=id=>{$('#home').hidden=id!=='home';$('#wiz').hidden=id!=='wiz';if(id==='wiz'&&!$('#mc').children.length)say('b','Hi! 👋 I\'m Lumi. Tell me about your menu — paste a list or just describe it, e.g. “Plov 16 manat with lamb and dried fruit, Dolma 9 manat, tea 2.5”. I\'ll build the table below.')};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const uid=()=>'u'+Math.random().toString(36).slice(2,9),AL=['gluten','dairy','nuts','egg','fish','shellfish','soy','sesame'];
+async function post(u,b){try{const r=await fetch(u,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});return await r.json()}catch{return{error:'Connection problem. Please try again.'}}}
+function say(w,t){const d=document.createElement('div');d.className='m '+(w==='u'?'u':'b');d.textContent=t;$('#mc').append(d);$('#mc').scrollTop=1e9;return d}
+async function demo(){$('#tx').value=(await (await fetch('/api/demo-text')).json()).text;if(!$('#nm').value)$('#nm').value='Qala Bistro';$('#tx').focus()}
+const strip=()=>items.map(({up,...x})=>x);
+async function imp(){const t=$('#tx').value.trim();if(!t)return $('#ms').textContent='Write something about your menu first.';$('#ms').textContent='';
+ say('u',t.length>400?t.slice(0,400)+'…':t);$('#tx').value='';$('#bi').disabled=true;const ty=say('b','…');ty.classList.add('typing');ty.innerHTML='<span></span><span></span><span></span>';
+ const r=await post('/api/menu-chat',{message:t,items:strip(),name:$('#nm').value,history:hist});ty.remove();$('#bi').disabled=false;
+ if(r.error){say('b','Sorry: '+r.error);return}
+ hist.push({role:'user',text:t},{role:'lumi',text:r.reply});items=r.items;if(r.name&&!$('#nm').value)$('#nm').value=r.name;if(r.tagline)meta.tagline=r.tagline;
+ say('b',r.reply);if(r.aiFailed)$('#ms').textContent='AI unavailable — used the basic parser. Please review carefully.';render()}
+function addRow(){items.push({uid:uid(),name:'',cat:'main',price:0,prep:10,veg:false,spice:0,allergens:null,ingredients:[],desc:'',available:true});render();const n=document.querySelectorAll('#tb input[data-k=name]');n[n.length-1]?.focus()}
+const alText=a=>a==null?'':a.length?a.join(', '):'none';
+function render(){$('#rev').hidden=false;const I=(it,k,x='')=>`data-u="${it.uid}" data-k="${k}" ${x}`;
+ $('#tb').innerHTML='<tr><th>Photo</th><th>Dish</th><th>Type</th><th>Price</th><th>Min</th><th>Veg</th><th>Spice</th><th>Allergens</th><th>Ingredients</th><th>Description</th><th>On</th><th></th></tr>'+items.map(it=>`<tr><td style="width:84px">${it.up?'<div class="sm mut">uploading…</div>':it.img?`<div style="position:relative;width:72px;height:54px"><img src="${esc(it.img)}" alt="" data-act="img" data-u="${it.uid}" style="width:72px;height:54px;object-fit:cover;border-radius:10px;cursor:pointer;border:1px solid var(--line)"><button data-act="rmimg" data-u="${it.uid}" title="Remove photo" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:0;background:#ff5d8f;color:#fff;cursor:pointer;font-size:12px;line-height:1">✕</button></div>`:`<button class="btn g sm" data-act="img" data-u="${it.uid}" style="width:72px;height:54px;padding:0;font-size:20px" title="Upload photo">📷</button>`}</td>
+ <td><input ${I(it,'name')} value="${esc(it.name)}" style="min-width:140px"></td><td><select ${I(it,'cat')}>${['starter','main','drink','dessert'].map(c=>`<option ${c==it.cat?'selected':''}>${c}</option>`).join('')}</select></td>
+ <td><input ${I(it,'price','type=number step=.5 min=0')} value="${it.price}" style="width:75px"></td><td><input ${I(it,'prep','type=number min=1')} value="${it.prep}" style="width:62px"></td>
+ <td><input ${I(it,'veg','type=checkbox')} ${it.veg?'checked':''}></td><td><input ${I(it,'spice','type=number min=0 max=3')} value="${it.spice||0}" style="width:58px"></td>
+ <td><input ${I(it,'allergens')} value="${esc(alText(it.allergens))}" placeholder="unknown" style="min-width:110px"></td><td><input ${I(it,'ingredients')} value="${esc((it.ingredients||[]).join(', '))}" style="min-width:150px"></td>
+ <td><input ${I(it,'desc')} value="${esc(it.desc||'')}" style="min-width:150px"></td><td><input ${I(it,'available','type=checkbox')} ${it.available!==false?'checked':''}></td>
+ <td><button class="btn g sm" data-act="del" data-u="${it.uid}" title="Delete row">🗑</button></td></tr>`).join('')}
+const row=u=>items.find(x=>x.uid===u);
+$('#tb').oninput=e=>{const t=e.target,it=row(t.dataset.u);if(!it||!t.dataset.k)return;const k=t.dataset.k;let v;
+ if(t.type==='checkbox')v=t.checked;else if(t.type==='number')v=+t.value;
+ else if(k==='allergens'){const w=t.value.trim().toLowerCase();v=w===''?null:/^(none|yox|нет|-)$/.test(w)?[]:w.split(/[,;\s]+/).filter(a=>AL.includes(a))}
+ else if(k==='ingredients')v=t.value.split(',').map(x=>x.trim()).filter(Boolean);else v=t.value;it[k]=v}
+$('#tb').onclick=e=>{const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,u=b.dataset.u;
+ if(a==='del'){items=items.filter(x=>x.uid!==u);render()}else if(a==='rmimg'){delete row(u).img;render()}else if(a==='img'){pick=u;$('#fi').value='';$('#fi').click()}}
+function shrink(file){return new Promise((ok,no)=>{const im=new Image(),url=URL.createObjectURL(file);im.onload=()=>{const s=Math.min(1,800/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*s));c.height=Math.max(1,Math.round(im.height*s));
+ const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(url);ok(c.toDataURL('image/jpeg',.82))};im.onerror=()=>{URL.revokeObjectURL(url);no()};im.src=url})}
+$('#fi').onchange=async e=>{const f=e.target.files[0],it=row(pick);if(!f||!it)return;it.up=true;render();
+ try{const r=await post('/api/upload',{data:await shrink(f)});if(r.url)it.img=r.url;else $('#ls').innerHTML=`<span class=err>${esc(r.error||'Upload failed')}</span>`}catch{$('#ls').innerHTML='<span class=err>Could not read that image.</span>'}
+ delete it.up;render()}
+async function launch(){const rows=strip().filter(x=>String(x.name).trim());if(!rows.length)return $('#ls').innerHTML='<span class=err>Add at least one dish.</span>';
+ const r=await post('/api/restaurants',{name:$('#nm').value||'My Restaurant',tagline:meta.tagline||'',items:rows});
+ $('#ls').innerHTML=r.id?`✅ Ready: <a href="/r/${r.id}">Guest screen</a> · <a href="/k/${r.id}">Kitchen screen</a>`:`<span class=err>${esc(r.error)}</span>`}
+</script></body></html>

@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kitchen · Lumi</title><link rel="stylesheet" href="/app.css"></head><body>
+<div class="orbs"><i></i><i></i><i></i></div>
+<div class="nav"><a class="logo" href="/" style="color:inherit"><i></i>Lumi <span class="mut" style="font-weight:500">Kitchen · <span id="rn"></span></span></a><div class="row"><span class="live"><span id="cnt">0 active</span></span><span class="mut" id="clk" style="font-size:20px;font-weight:700"></span><a id="gl" href="#">Guest screen</a></div></div>
+<main class="wrap"><div class="cols" id="cols"></div></main>
+<script>
+const rid=location.pathname.split('/')[2],S=['New','Accepted','Preparing','Ready'],NX={New:'Accepted',Accepted:'Preparing',Preparing:'Ready',Ready:'Delivered'},seen=new Set();let first=true;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));document.querySelector('#gl').href='/r/'+rid;
+fetch('/api/restaurants/'+rid).then(r=>r.json()).then(r=>document.querySelector('#rn').textContent=r.name||'');
+setInterval(()=>document.querySelector('#clk').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),1000);
+async function go(id,s){await fetch('/api/orders/'+id,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({status:s})});load()}
+function beep(){try{const c=new AudioContext(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.08;o.start();o.stop(c.currentTime+.15)}catch{}}
+async function load(){const {orders}=await (await fetch('/api/kitchen/'+rid)).json();document.querySelector('#cnt').textContent=orders.filter(o=>o.status!=='Delivered').length+' active orders';
+ if(!first&&orders.some(o=>!seen.has(o.id)))beep();orders.forEach(o=>seen.add(o.id));first=false;
+ document.querySelector('#cols').innerHTML=S.map(s=>{const L=orders.filter(o=>o.status===s);return`<div class="col c-${s}"><h3>${s}<span>${L.length}</span></h3>${L.map(o=>{const age=Math.floor((Date.now()-o.created)/6e4);return`<div class="glass ord"><div class="row sp"><span class="t">Table ${esc(o.table)}</span><span class="sm mut">${age} min ago · ETA ${o.etaMin}m</span></div><div style="margin-top:8px">${o.lines.map(l=>`<div><b>${l.qty}×</b> ${esc(l.name)}</div>`).join('')}</div>${o.note?`<div class="note">⚠ ${esc(o.note)}</div>`:''}<div class="row sp" style="margin-top:12px"><b>₼${o.total.toFixed(2)}</b><button class="btn sm" onclick="go('${o.id}','${NX[s]}')">${NX[s]} →</button></div></div>`}).join('')||'<div class="mut" style="padding:12px">No orders</div>'}</div>`}).join('')}
+load();setInterval(load,3000);
+</script></body></html>

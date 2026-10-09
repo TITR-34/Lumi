@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lumi</title><link rel="stylesheet" href="/app.css"></head><body>
+<div class="orbs"><i></i><i></i><i></i></div>
+<div class="nav"><a class="logo" href="/" style="color:inherit"><i></i>Lumi</a><div class="row"><a id="kl" href="#">Kitchen screen</a><button class="btn g sm" onclick="call()">🔔 Call waiter</button></div></div>
+<main class="wrap"><div class="rh up"><img id="hi" alt=""><div><span class="live">Open now</span><h1 id="rn" style="margin:10px 0 8px">…</h1><p class="mut" id="rt"></p></div></div>
+<div class="lay"><div><div class="tabs" id="tabs"></div><div class="items" id="menu"></div></div>
+<div class="side"><div class="glass pad"><div class="row sp"><h3>✨ Ask Lumi</h3><span class="sm mut">AZ · EN · RU</span></div>
+<div class="chat" id="chat" style="margin-top:12px"></div><div class="chips" id="chips"></div>
+<div class="row"><input id="in" placeholder="2 nəfər, 40 manat, biri vegetarian…" onkeydown="if(event.key==='Enter')send()"><button class="btn" id="sb" onclick="send()">Send</button></div></div>
+<div class="glass pad" style="overflow:auto"><h3>Your order</h3><div id="ol" class="sm mut" style="padding:10px 0">Nothing yet — add dishes or ask Lumi.</div>
+<div class="row sp"><span class="mut">Total</span><span class="tot grad" id="tot"></span></div>
+<div class="row" style="margin:12px 0 8px"><input id="tb" placeholder="Table #" style="width:110px"><input id="nt" placeholder="Special requests (e.g. no spicy sauce)"></div>
+<button class="btn" style="width:100%" id="sub" onclick="submit()">Place order</button><div id="msg" class="sm" style="margin-top:10px"></div><div id="st"></div></div></div></div></main>
+<script>
+const $=s=>document.querySelector(s),rid=location.pathname.split('/')[2];let R,order={},C={},placed=null,poll,tab='all';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const f=n=>R.currency+(+n).toFixed(2),by=id=>R.menu.find(i=>i.id===id);
+const EM={starter:'🥗',main:'🍽️',drink:'🥤',dessert:'🍰'},CL={starter:'Starters',main:'Mains',dessert:'Desserts',drink:'Drinks'};
+let PH={},hist=[],shown=[];
+async function photos(items){ // real dish photos from Wikipedia/Wikimedia Commons; falls back to emoji tile if none
+  const key=i=>i.wiki||i.name,titles=[...new Set(items.map(key))];let cache={};try{cache=JSON.parse(localStorage.getItem('lumi-ph')||'{}')}catch{}
+  const need=titles.filter(t=>!(t in cache));
+  for(let n=0;n<need.length;n+=40){const part=need.slice(n,n+40);
+    try{const q=(await (await fetch('https://en.wikipedia.org/w/api.php?action=query&redirects=1&prop=pageimages&piprop=thumbnail&pithumbsize=700&format=json&origin=*&titles='+encodeURIComponent(part.join('|')))).json()).query||{},map={};
+      part.forEach(t=>map[t]=t);for(const l of [q.normalized||[],q.redirects||[]])for(const x of l)for(const t of part)if(map[t]===x.from)map[t]=x.to;
+      const pg=Object.values(q.pages||{});part.forEach(t=>{cache[t]=(pg.find(p=>p.title===map[t])||{}).thumbnail?.source||''})}catch{}}
+  try{localStorage.setItem('lumi-ph',JSON.stringify(cache))}catch{}return cache}
+async function j(u,m,b){const r=await fetch('/api'+u,{method:m||'GET',headers:{'content-type':'application/json'},body:b&&JSON.stringify(b)});return r.json()}
+(async()=>{R=await j('/restaurants/'+rid);if(R.error){document.body.innerHTML='<main class=wrap><br>Restaurant not found. <a href="/">Home</a></main>';return}
+ document.title=R.name+' · Lumi';$('#rn').textContent=R.name;$('#rt').textContent=R.tagline||'';$('#kl').href='/k/'+rid;
+ $('#hi').onerror=e=>e.target.remove();photos(R.menu.filter(i=>!i.img)).then(p=>{PH=p;rm();const h=R.menu.find(i=>i.badge)||R.menu[0],u=h.img||p[h.wiki||h.name];if(u)$('#hi').src=u});
+ bot(`Hi, I'm Lumi 👋 your AI waiter at ${R.name}. Tell me your budget, time, diet or allergies — or just browse the menu.`);
+ $('#chips').innerHTML=['2 nəfər, 40 manat, biri vegetarian, acı olmasın','15 dəqiqəm var, 20 manat','Qoz allergiyam var, 2 nəfər','Başqa variant göstər'].map(t=>`<button class="tag" onclick="$('#in').value=this.textContent;send()">${esc(t)}</button>`).join('');rm();ro()})();
+function bot(t,o,basic){const d=document.createElement('div');d.className='m b';d.textContent=t;if(basic){const n=document.createElement('div');n.className='sm mut';n.style.cssText='margin-top:6px;font-size:11px;opacity:.6';n.textContent='⚡ simple mode';d.append(n)}$('#chat').append(d);if(o)for(const [k,x] of o.entries()){const e=document.createElement('div');e.className='opt';
+ e.innerHTML=`<div class="row sp"><b>Option ${k+1}</b><span><b>${f(x.total)}</b> · <span class="mut">~${x.minutes} min</span></span></div><div class="sm mut" style="margin-top:4px">${x.items.map(i=>(i.emo||EM[i.cat])+' '+esc(i.name)).join(' + ')}</div>`;
+ const b=document.createElement('button');b.className='btn sm';b.style.marginTop='10px';b.textContent='Use this order';b.onclick=()=>{order={};x.items.forEach(i=>order[i.id]=(order[i.id]||0)+1);ro()};e.append(b);d.append(e)}$('#chat').scrollTop=1e9}
+async function send(){const t=$('#in').value.trim();if(!t)return;$('#in').value='';const d=document.createElement('div');d.className='m u';d.textContent=t;$('#chat').append(d);
+ const ty=document.createElement('div');ty.className='m b typing';ty.innerHTML='<span></span><span></span><span></span>';$('#chat').append(ty);$('#chat').scrollTop=1e9;$('#sb').disabled=true;
+ try{const r=await j('/chat','POST',{rid,message:t,constraints:C,order,history:hist.slice(-6),shown});ty.remove();hist.push({role:'user',text:t});if(r.error)bot('Sorry: '+r.error);else{C=r.constraints;if(r.order){order=r.order;ro()}hist.push({role:'lumi',text:r.text.slice(0,200)});(r.options||[]).forEach(o=>o.key&&shown.push(o.key));bot(r.text,r.options,r.aiFailed)}}catch{ty.remove();bot('Connection problem. Please try again or call a waiter.')}$('#sb').disabled=false}
+function rm(){const cats=['starter','main','dessert','drink'].filter(c=>R.menu.some(i=>i.cat===c));
+ $('#tabs').innerHTML=['all',...cats].map(c=>`<button class="${c===tab?'on':''}" onclick="tab='${c}';rm()">${c==='all'?'Everything':CL[c]}</button>`).join('');
+ $('#menu').innerHTML=R.menu.filter(i=>tab==='all'||i.cat===tab).map((i,k)=>`<div class="dish glass" style="--d:${k*45}ms"><div class="ph"><span>${i.emo||EM[i.cat]}</span>${(i.img||PH[i.wiki||i.name])?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(i.img||PH[i.wiki||i.name])}" alt="" onerror="this.remove()">`:''}${i.badge?`<span class="bdg">${esc(i.badge)}</span>`:''}<span class="pr">${f(i.price)}</span></div>
+ <div class="bd"><b>${esc(i.name)}</b><p>${esc(i.desc||'')}</p><div>${i.veg?'<span class="tag v">vegetarian</span>':''}${i.spice?`<span class="tag h">${'🌶'.repeat(i.spice)}</span>`:''}<span class="tag">⏱ ${i.prep} min</span>${i.allergens==null?'<span class="tag">allergens: ask staff</span>':i.allergens.length?`<span class="tag">${esc(i.allergens.join(', '))}</span>`:''}</div>
+ <button class="btn ${i.available===false?'g':''}" ${i.available===false?'disabled':''} onclick="add('${i.id}',1)">${i.available===false?'Unavailable':'+ Add to order'}</button></div></div>`).join('')}
+function add(id,d){order[id]=(order[id]||0)+d;if(order[id]<=0)delete order[id];ro()}
+function ro(){const ids=Object.keys(order);$('#ol').innerHTML=ids.length?ids.map(id=>{const i=by(id);return`<div class="ln"><span>${i.emo||EM[i.cat]} ${esc(i.name)}<br><span class="mut sm">${f(i.price)}</span></span><span class="q"><button onclick="add('${id}',-1)">−</button>${order[id]}<button onclick="add('${id}',1)">+</button></span></div>`}).join(''):'Nothing yet — add dishes or ask Lumi.';
+ $('#tot').textContent=f(ids.reduce((a,id)=>a+by(id).price*order[id],0))}
+async function submit(){const items=Object.entries(order).map(([id,qty])=>({id,qty}));$('#sub').disabled=true;$('#msg').textContent='';
+ const r=await j('/orders','POST',{rid,table:$('#tb').value,note:$('#nt').value,items});$('#sub').disabled=false;
+ if(r.error)return $('#msg').innerHTML=`<span class=err>${esc(r.error)}</span>`;placed=r.id;order={};ro();$('#msg').innerHTML=`<span class=ok>✓ Sent to the kitchen — total ${f(r.total)} verified by the server.</span>`;clearInterval(poll);track();poll=setInterval(track,3000)}
+async function track(){const o=await j('/orders/'+placed),S=['New','Accepted','Preparing','Ready'],k=S.indexOf(o.status),rem=Math.max(1,Math.ceil(o.etaMin-(Date.now()-o.created)/6e4));
+ $('#st').innerHTML=`<div class="glass pad" style="margin-top:12px;background:rgba(255,180,84,.08)"><div style="font-size:20px;font-weight:800">${o.status==='Ready'?'🍽 Ready — on its way!':o.status==='Delivered'?'✅ Delivered. Enjoy!':({New:'Order received',Accepted:'Accepted by the kitchen',Preparing:'👨‍🍳 Preparing…'})[o.status]}</div>
+ <div class="prog">${S.map((s,i)=>`<i class="${i<=k||o.status==='Delivered'?'on':''}"></i>`).join('')}</div><div class="sm mut">${['New','Accepted','Preparing'].includes(o.status)?`Ready in about <b style="color:var(--a)">${rem} min</b>`:''}</div><div class="sm" style="margin-top:6px">${o.lines.map(l=>l.qty+'× '+esc(l.name)).join(', ')}</div></div>`;if(o.status==='Delivered')clearInterval(poll)}
+function call(){$('#msg').innerHTML='<span class=ok>🔔 A waiter has been notified (demo).</span>'}
+</script></body></html>
